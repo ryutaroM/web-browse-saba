@@ -1,13 +1,14 @@
 extern crate alloc;
-use crate::alloc::string::ToString;
 use alloc::format;
 use alloc::string::String;
+use alloc::string::ToString;
 use alloc::vec::Vec;
 use noli::net::lookup_host;
 use noli::net::SocketAddr;
 use noli::net::TcpStream;
 use saba_core::error::Error;
 use saba_core::http::HttpResponse;
+
 pub struct HttpClient {}
 
 impl HttpClient {
@@ -20,9 +21,9 @@ impl HttpClient {
             Ok(ips) => ips,
             Err(e) => {
                 return Err(Error::Network(format!(
-                    "Failed to find IP address: {:#?}",
+                    "Failed to find IP addresses: {:#?}",
                     e
-                )));
+                )))
             }
         };
 
@@ -33,7 +34,7 @@ impl HttpClient {
         let socket_addr: SocketAddr = (ips[0], port).into();
 
         let mut stream = match TcpStream::connect(socket_addr) {
-            OK(stream) => stream,
+            Ok(stream) => stream,
             Err(_) => {
                 return Err(Error::Network(
                     "Failed to connect to TCP stream".to_string(),
@@ -42,8 +43,10 @@ impl HttpClient {
         };
 
         let mut request = String::from("GET /");
-        request.push(&str);
+        request.push_str(&path);
         request.push_str(" HTTP/1.1\n");
+
+        // ヘッダの追加
         request.push_str("Host: ");
         request.push_str(&host);
         request.push('\n');
@@ -56,7 +59,7 @@ impl HttpClient {
             Err(_) => {
                 return Err(Error::Network(
                     "Failed to send a request to TCP stream".to_string(),
-                ));
+                ))
             }
         };
 
@@ -68,14 +71,12 @@ impl HttpClient {
                 Err(_) => {
                     return Err(Error::Network(
                         "Failed to receive a request from TCP stream".to_string(),
-                    ));
+                    ))
                 }
             };
-
             if bytes_read == 0 {
                 break;
             }
-
             received.extend_from_slice(&buf[..bytes_read]);
         }
 
