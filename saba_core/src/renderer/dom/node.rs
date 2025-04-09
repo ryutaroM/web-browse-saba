@@ -7,11 +7,24 @@ use alloc::vec::Vec;
 use core::cell::RefCell;
 use core::str::FromStr;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq)]
 pub enum NodeKind {
     Document,
     Element(Element),
     Text(String),
+}
+
+impl PartialEq for NodeKind {
+    fn eq(&self, other: &Self) -> bool {
+        match &self {
+            NodeKind::Document => matches!(other, NodeKind::Document),
+            NodeKind::Element(e1) => match &other {
+                NodeKind::Element(e2) => e1.kind == e2.kind,
+                _ => false,
+            },
+            NodeKind::Text(_) => matches!(other, NodeKind::Text(_)),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -32,6 +45,10 @@ impl Window {
 
         window
     }
+
+    pub fn document(&self) -> Rc<RefCell<Node>> {
+        self.document.clone()
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -41,6 +58,10 @@ pub enum ElementKind {
     Style,
     Script,
     Body,
+    P,
+    H1,
+    H2,
+    A,
 }
 
 impl FromStr for ElementKind {
@@ -53,6 +74,10 @@ impl FromStr for ElementKind {
             "style" => Ok(ElementKind::Style),
             "script" => Ok(ElementKind::Script),
             "body" => Ok(ElementKind::Body),
+            "p" => Ok(ElementKind::P),
+            "h1" => Ok(ElementKind::H1),
+            "h2" => Ok(ElementKind::H2),
+            "a" => Ok(ElementKind::A),
             _ => Err(format!("unimplemented element name {:?}", s)),
         }
     }
@@ -87,6 +112,12 @@ pub struct Node {
     next_sibling: Option<Rc<RefCell<Node>>>,
 }
 
+impl PartialEq for Node {
+    fn eq(&self, other: &Self) -> bool {
+        self.kind == other.kind
+    }
+}
+
 impl Node {
     pub fn new(kind: NodeKind) -> Self {
         Self {
@@ -100,7 +131,11 @@ impl Node {
         }
     }
 
-    pub fn set_param(&mut self, parent: Weak<RefCell<Node>>) {
+    pub fn set_window(&mut self, window: Weak<RefCell<Window>>) {
+        self.window = window
+    }
+
+    pub fn set_parent(&mut self, parent: Weak<RefCell<Node>>) {
         self.parent = parent;
     }
 
@@ -138,10 +173,6 @@ impl Node {
 
     pub fn next_sibling(&self) -> Option<Rc<RefCell<Node>>> {
         self.next_sibling.as_ref().cloned()
-    }
-
-    pub fn set_window(&mut self, window: Weak<RefCell<Window>>) {
-        self.window = window;
     }
 
     pub fn kind(&self) -> NodeKind {
