@@ -27,6 +27,7 @@ impl Page {
     pub fn set_browser(&mut self, browser: Weak<RefCell<Browser>>) {
         self.browser = browser;
     }
+
     pub fn receive_response(&mut self, response: HttpResponse) -> String {
         self.create_frame(response.body());
 
