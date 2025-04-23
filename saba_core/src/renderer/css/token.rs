@@ -11,7 +11,7 @@ pub enum CssToken {
     CloseParenthesis,
     OpenCurly,
     CloseCurly,
-    Indent(String),
+    Ident(String),
     StringToke(String),
     AtKeyword(String),
 }
@@ -48,6 +48,57 @@ impl CssTokenizer {
 
         s
     }
+
+    fn consume_numeric_token(&mut self) -> f64 {
+        let mut num = 0f64;
+        let mut floating = false;
+        let mut floating_digit = 1f64;
+
+        loop {
+            if self.pos >= self.input.len() {
+                return num;
+            }
+
+            let c = self.input[self.pos];
+
+            match c {
+                '0'..='9' => {
+                    if floating {
+                        floating_digit *= 1f64 / 10f64;
+                        num += (c.to_digit(10).unwrap() as f64) * floating_digit;
+                    } else {
+                        num = num * 10.0 + (c.to_digit(10).unwrap() as f64);
+                    }
+                    self.pos += 1;
+                }
+                '.' => {
+                    floating = true;
+                    self.pos += 1;
+                }
+                _ => break,
+            }
+        }
+
+        num
+    }
+
+    fn consume_ident_token(&mut self) -> String {
+        let mut s = String::new();
+        s.push(self.input[self.pos]);
+
+        loop {
+            self.pos += 1;
+            let c = self.input[self.pos];
+            match c {
+                'a'..='z' | 'A'..='Z' | '0'..='9' | '-' | '_' => {
+                    s.push(c);
+                }
+                _ => break,
+            }
+        }
+
+        s
+    }
 }
 
 impl Iterator for CssTokenizer {
@@ -77,6 +128,39 @@ impl Iterator for CssTokenizer {
                 '"' | '\'' => {
                     let value = self.consume_string_token();
                     CssToken::StringToke(value)
+                }
+                '0'..='9' => {
+                    let t = CssToken::Number(self.consume_numeric_token());
+                    self.pos -= 1;
+                    t
+                }
+                '#' => {
+                    let value = self.consume_ident_token();
+                    self.pos -= 1;
+                    CssToken::HashToken(value)
+                }
+                '-' => {
+                    let t = CssToken::Ident(self.consume_ident_token());
+                    self.pos -= 1;
+                    t
+                }
+                '@' => {
+                    if self.input[self.pos + 1].is_alphabetic()
+                        && self.input[self.pos + 2].is_alphabetic()
+                        && self.input[self.pos + 3].is_alphabetic()
+                    {
+                        self.pos += 1;
+                        let t = CssToken::AtKeyword(self.consume_ident_token());
+                        self.pos -= 1;
+                        t
+                    } else {
+                        CssToken::Delim('@')
+                    }
+                }
+                'a'..='z' | 'A'..='Z' | '_' => {
+                    let t = CssToken::Ident(self.consume_ident_token());
+                    self.pos -= 1;
+                    t
                 }
                 _ => {
                     unimplemented!("char {} is not supported yet.", c)
