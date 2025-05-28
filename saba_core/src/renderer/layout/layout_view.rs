@@ -1,4 +1,3 @@
-use super::layout_object;
 use super::layout_object::LayoutObjectKind;
 use crate::constants::CONTENT_AREA_WIDTH;
 use crate::renderer::css::cssom::StyleSheet;
@@ -7,7 +6,6 @@ use crate::renderer::dom::node::ElementKind;
 use crate::renderer::dom::node::Node;
 use crate::renderer::layout::layout_object::create_layout_object;
 use crate::renderer::layout::layout_object::LayoutObject;
-use crate::renderer::layout::layout_object::LayoutObjectKind;
 use crate::renderer::layout::layout_object::LayoutPoint;
 use crate::renderer::layout::layout_object::LayoutSize;
 use alloc::rc::Rc;
@@ -20,7 +18,7 @@ pub struct LayoutView {
 
 impl LayoutView {
     pub fn new(root: Rc<RefCell<Node>>, cssom: &StyleSheet) -> Self {
-        let body_root = get_target_node(Some(root), ElementKind::Body);
+        let body_root = get_target_element_node(Some(root), ElementKind::Body);
 
         let mut tree = Self {
             root: build_layout_tree(&body_root, &None, cssom),
@@ -61,6 +59,41 @@ impl LayoutView {
 
             n.borrow_mut().compute_size(parent_size);
         }
+    }
+
+    fn calculate_node_position(
+        node: &Option<Rc<RefCell<LayoutObject>>>,
+        parent_point: LayoutPoint,
+        previous_sibiling_kind: LayoutObjectKind,
+        previous_sibiling_point: Option<LayoutPoint>,
+        previous_sibiling_size: Option<LayoutSize>,
+    ) {
+        if let Some(n) = node {
+            n.borrow_mut().compute_position(
+                parent_point,
+                previous_sibiling_kind,
+                previous_sibiling_point,
+                previous_sibiling_size,
+            );
+
+            let first_child = n.borrow().first_child();
+            Self::calculate_node_position(
+                &first_child,
+                n.borrow().point(),
+                LayoutObjectKind::Block,
+                None,
+                None,
+            );
+
+            let next_sibling = n.borrow().next_sibling();
+            Self::calculate_node_position(
+                &next_sibling,
+                parent_point,
+                n.borrow().kind(),
+                Some(n.borrow().point()),
+                Some(n.borrow().size()),
+            );
+        };
     }
 }
 

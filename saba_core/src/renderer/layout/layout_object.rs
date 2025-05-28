@@ -16,6 +16,7 @@ use alloc::rc::Rc;
 use alloc::rc::Weak;
 use alloc::vec::Vec;
 use core::cell::RefCell;
+
 #[derive(Debug, Clone)]
 pub struct LayoutObject {
     kind: LayoutObjectKind,
@@ -87,7 +88,7 @@ impl LayoutObject {
         self.size
     }
 
-    pub fn in_node_selected(&self, selector: &Selector) -> bool {
+    pub fn is_node_selected(&self, selector: &Selector) -> bool {
         match &self.node_kind() {
             NodeKind::Element(e) => match selector {
                 Selector::TypeSelector(type_name) => {
@@ -269,6 +270,43 @@ impl LayoutObject {
         }
 
         self.size = size;
+    }
+
+    pub fn compute_position(
+        &mut self,
+        parent_point: LayoutPoint,
+        previous_sibiling_kind: LayoutObjectKind,
+        previous_sibiling_point: Option<LayoutPoint>,
+        previous_sibiling_size: Option<LayoutSize>,
+    ) {
+        let mut point = LayoutPoint::new(0, 0);
+
+        match (self.kind(), previous_sibiling_kind) {
+            (LayoutObjectKind::Block, _) | (_, LayoutObjectKind::Block) => {
+                if let (Some(size), Some(pos)) = (previous_sibiling_size, previous_sibiling_point) {
+                    point.set_y(pos.y() + size.height());
+                } else {
+                    point.set_y(parent_point.y());
+                }
+                point.set_x(parent_point.x())
+            }
+
+            (LayoutObjectKind::Inline, LayoutObjectKind::Inline) => {
+                if let (Some(size), Some(pos)) = (previous_sibiling_size, previous_sibiling_point) {
+                    point.set_x(pos.x() + size.width());
+                    point.set_y(pos.y());
+                } else {
+                    point.set_x(parent_point.x());
+                    point.set_y(parent_point.y())
+                }
+            }
+            _ => {
+                point.set_x(parent_point.x());
+                point.set_y(parent_point.y())
+            }
+        }
+
+        self.point = point;
     }
 }
 
