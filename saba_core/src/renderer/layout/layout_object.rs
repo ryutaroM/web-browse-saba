@@ -29,6 +29,12 @@ pub struct LayoutObject {
     size: LayoutSize,
 }
 
+impl PartialEq for LayoutObject {
+    fn eq(&self, other: &Self) -> bool {
+        self.kind == other.kind
+    }
+}
+
 impl LayoutObject {
     pub fn new(node: Rc<RefCell<Node>>, parent_obj: &Option<Rc<RefCell<LayoutObject>>>) -> Self {
         let parent = match parent_obj {
