@@ -8,4 +8,4 @@ pub mod http;
 pub mod renderer;
 pub mod url;
 pub mod utils;
-pub mod display_items;
+pub mod display_item;
