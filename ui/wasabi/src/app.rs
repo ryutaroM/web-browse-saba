@@ -1,4 +1,5 @@
 use crate::alloc::string::ToString;
+use crate::cursor::Cursor;
 use alloc::format;
 use alloc::rc::Rc;
 use alloc::string::String;
@@ -26,6 +27,7 @@ pub struct WasabiUI {
     input_url: String,
     input_mode: InputMode,
     window: Window,
+    cursor: Cursor,
 }
 
 impl WasabiUI {
@@ -43,6 +45,7 @@ impl WasabiUI {
                 WINDOW_HEIGHT,
             )
             .unwrap(),
+            cursor: Cursor::new(),
         }
     }
 
@@ -114,20 +117,20 @@ impl WasabiUI {
         }
     }
 
-    fn handle_mouse_input(&mut self) -> Result<(), Error> {
-        if let Some(MouseEvent {
-            button: button,
-            position,
-        }) = Api::get_mouse_cursor_info()
-        {
-            println!("mouse position: {:?}", position);
-            if button.l() || button.c() || button.r() {
-                println!("mouse clicked {:?}", button);
-            }
-        }
+    // fn handle_mouse_input(&mut self) -> Result<(), Error> {
+    //     if let Some(MouseEvent {
+    //         button: button,
+    //         position,
+    //     }) = Api::get_mouse_cursor_info()
+    //     {
+    //         println!("mouse position: {:?}", position);
+    //         if button.l() || button.c() || button.r() {
+    //             println!("mouse clicked {:?}", button);
+    //         }
+    //     }
 
-        Ok(())
-    }
+    //     Ok(())
+    // }
 
     fn handle_key_input(&mut self) -> Result<(), Error> {
         match self.input_mode {
@@ -212,6 +215,46 @@ impl WasabiUI {
             )
             .expect("failed to create a rect for the address bar"),
         );
+
+        Ok(())
+    }
+
+    fn handle_mouse_input(&mut self) -> Result<(), Error> {
+        if let Some(MouseEvent { button, position }) = Api::get_mouse_cursor_info() {
+            self.window.flush_area(self.cursor.rect());
+            self.cursor.set_position(position.x, position.y);
+            self.window.flush_area(self.cursor.rect());
+            self.cursor.flush();
+
+            if button.l() || button.c() || button.r() {
+                let relative_pos = (
+                    position.x - WINDOW_INIT_X_POS,
+                    position.y - WINDOW_INIT_Y_POS,
+                );
+
+                if relative_pos.0 < 0
+                    || relative_pos.0 > WINDOW_WIDTH
+                    || relative_pos.1 < 0
+                    || relative_pos.1 > WINDOW_HEIGHT
+                {
+                    println!("button clicked OUTSIDE window: {button:?}{position:?}");
+
+                    return Ok(());
+                }
+
+                if relative_pos.1 < TOOLBAR_HEIGHT + TITLE_BAR_HEIGHT
+                    && relative_pos.1 >= TITLE_BAR_HEIGHT
+                {
+                    self.clear_address_bar()?;
+                    self.input_url = String::new();
+                    self.input_mode = InputMode::Editing;
+                    println!("button clicked in toolbar: {button:?}{position:?}");
+                    return Ok(());
+                }
+
+                self.input_mode = InputMode::Normal;
+            }
+        }
 
         Ok(())
     }
