@@ -6,12 +6,17 @@ use alloc::vec::Vec;
 pub enum Token {
     Punctuator(char),
     Number(u64),
+    Identifier(String), // meaning variable
+    Keyword(String),
+    StringLiteral(String),
 }
 
 pub struct JsLexer {
     pos: usize,
     input: Vec<char>,
 }
+
+static RESERVED_WORDS: [&str; 1] = ["var"];
 
 impl JsLexer {
     pub fn new(js: String) -> Self {
@@ -42,6 +47,48 @@ impl JsLexer {
 
         return num;
     }
+
+    fn contains(&self, keyword: &str) -> bool {
+        for i in 0..keyword.len() {
+            if keyword
+                .chars()
+                .nth(i)
+                .expect("failed to access to i-th chars")
+                != self.input[self.pos + 1]
+            {
+                return false;
+            }
+        }
+
+        true
+    }
+
+    fn check_reserved_word(&self) -> Option<String> {
+        for word in RESERVED_WORDS {
+            if self.contains(word) {
+                return Some(word.to_string());
+            }
+        }
+
+        None
+    }
+
+    fn consume_identifier(&mut self) -> String {
+        let mut result = String::new();
+
+        loop {
+            if self.pos >= self.input.len() {
+                return result;
+            }
+
+            if self.input[self.pos].is_ascii_alphanumeric() || self.input[self.pos] == '$' {
+                result.push(self.input[self.pos]);
+                self.pos += 1;
+            } else {
+                return result;
+            }
+        }
+    }
 }
 
 impl Iterator for JsLexer {
@@ -60,6 +107,12 @@ impl Iterator for JsLexer {
             }
         }
 
+        if let Some(keyword) = self.check_reserved_word() {
+            self.pos += keyword.len();
+            let token = Some(Token::Keyword(keyword));
+            return token;
+        }
+
         let c = self.input[self.pos];
 
         let token = match c {
@@ -69,6 +122,7 @@ impl Iterator for JsLexer {
                 t
             }
             '0'..='9' => Token::Number(self.consume_number()),
+            'a'..='z' | 'A'..='Z' | '_' | '$' => Token::Identifier(self.consume_identifier()),
             _ => unimplemented!("char {:?} is not supported yet", c),
         };
 
