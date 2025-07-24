@@ -32,6 +32,21 @@ pub enum Node {
     },
     Identifier(String),
     StringLiteral(String),
+    BlockStatement {
+        body: Vec<Option<Rc<Node>>>,
+    },
+    ReturnStatement {
+        argument: Option<Rc<Node>>,
+    },
+    FunctionDeclaration {
+        id: Option<Rc<Node>>,
+        params: Vec<Option<Rc<Node>>>,
+        body: Option<Rc<Node>>,
+    },
+    CallExpression {
+        callee: Option<Rc<Node>>,
+        arguments: Vec<Option<Rc<Node>>>,
+    },
 }
 
 impl Node {
