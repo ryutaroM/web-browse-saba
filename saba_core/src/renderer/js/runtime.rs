@@ -14,12 +14,14 @@ use core::ops::Sub;
 
 #[derive(Debug, Clone)]
 pub struct JsRuntime {
+    functions: Vec<Function>,
     env: Rc<RefCell<Environment>>,
 }
 
 impl JsRuntime {
     pub fn new() -> Self {
         Self {
+            functions: Vec::new(),
             env: Rc::new(RefCell::new(Environment::new(None))),
         }
     }
@@ -110,8 +112,64 @@ impl JsRuntime {
                 Some(v) => Some(v),
                 None => Some(RuntimeValue::StringLiteral(name.to_string())),
             },
+            Node::BlockStatement { body } => {
+                let mut result: Option<RuntimeValue> = None;
+                for stmt in body {
+                    result = self.eval(&stmt, env.clone());
+                }
+                result
+            }
+            Node::ReturnStatement { argument } => {
+                return self.eval(&argument, env.clone());
+            }
+            Node::FunctionDeclaration { id, params, body } => {
+                if let Some(RuntimeValue::StringLiteral(id)) = self.eval(&id, env.clone()) {
+                    let cloned_body = match body {
+                        Some(b) => Some(b.clone()),
+                        None => None,
+                    };
+                    self.functions
+                        .push(Function::new(id, params.to_vec(), cloned_body));
+                };
+                None
+            }
+            Node::CallExpression { callee, arguments } => {
+                let new_env = Rc::new(RefCell::new(Environment::new(Some(env))));
+
+                let callee_value = match self.eval(callee, new_env.clone()) {
+                    Some(value) => value,
+                    None => return None,
+                };
+
+                let function = {
+                    let mut f: Option<Function> = None;
+
+                    for func in &self.functions {
+                        if callee_value == RuntimeValue::StringLiteral(func.id.to_string()) {
+                            f = Some(func.clone());
+                        }
+                    }
+
+                    match f {
+                        Some(f) => f,
+                        None => panic!("functions {:?} donesn't exist", callee),
+                    }
+                };
+
+                assert!(arguments.len() == function.params.len());
+                for (i, item) in arguments.iter().enumerate() {
+                    if let Some(RuntimeValue::StringLiteral(name)) =
+                        self.eval(&function.params[i], new_env.clone())
+                    {
+                        new_env
+                            .borrow_mut()
+                            .add_variable(name, self.eval(item, new_env.clone()));
+                    }
+                }
+
+                self.eval(&function.body.clone(), new_env.clone())
+            }
             Node::StringLiteral(value) => Some(RuntimeValue::StringLiteral(value.to_string())),
-            _ => todo!(),
         }
     }
 }
@@ -199,6 +257,20 @@ impl Environment {
         }
     }
 }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Function {
+    id: String,
+    params: Vec<Option<Rc<Node>>>,
+    body: Option<Rc<Node>>,
+}
+
+impl Function {
+    fn new(id: String, params: Vec<Option<Rc<Node>>>, body: Option<Rc<Node>>) -> Self {
+        Self { id, params, body }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use alloc::string::ToString;
