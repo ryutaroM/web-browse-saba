@@ -87,6 +87,25 @@ impl JsRuntime {
                         return None;
                     }
                 }
+
+                if let Some(RuntimeValue::HtmlElement { object, property }) =
+                    self.eval(left, env.clone())
+                {
+                    let right_value = match self.eval(right, env.clone()) {
+                        Some(value) => value,
+                        None => return None,
+                    };
+
+                    if let Some(p) = property {
+                        if p == "textContent" {
+                            object
+                                .borrow_mut()
+                                .set_first_child(Some(Rc::new(RefCell::new(DomNode::new(
+                                    DomNodeKind::Text(right_value.to_string()),
+                                )))));
+                        }
+                    }
+                }
                 None
             }
             Node::MemberExpression { object, property } => {
@@ -98,6 +117,14 @@ impl JsRuntime {
                     Some(value) => value,
                     None => return Some(object_value),
                 };
+
+                if let RuntimeValue::HtmlElement { object, property } = object_value {
+                    assert!(property.is_none());
+                    return Some(RuntimeValue::HtmlElement {
+                        object,
+                        property: Some(property_value.to_string()),
+                    });
+                }
 
                 return Some(
                     object_value + RuntimeValue::StringLiteral(".".to_string()) + property_value,
@@ -152,6 +179,11 @@ impl JsRuntime {
                     Some(value) => value,
                     None => return None,
                 };
+
+                let api_result = self.call_browser_api(&callee_value, arguments, new_env.clone());
+                if api_result.0 {
+                    return api_result.1;
+                }
 
                 let function = {
                     let mut f: Option<Function> = None;
